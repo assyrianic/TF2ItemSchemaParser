@@ -1,5 +1,10 @@
 
 #include <stdlib.h>
+//#define DEBUG 1
+
+#ifdef DEBUG
+	#include <stdio.h>
+#endif
 #include "dsc.h"
 
 /*
@@ -24,13 +29,14 @@ void String_Del(struct String *const restrict strobj)
 	strobj->Len = 0;
 }
 
-void String_Free(struct String **restrict strobj)
+bool String_Free(struct String **restrict strobj)
 {
 	if( !*strobj )
-		return;
+		return false;
 	
 	String_Del(*strobj);
 	free(*strobj), *strobj=NULL;
+	return true;
 }
 
 void String_Init(struct String *const restrict strobj)
@@ -66,7 +72,7 @@ void String_AddChar(struct String *const restrict strobj, const char c)
 
 void String_Add(struct String *const restrict strobjA, const struct String *const restrict strobjB)
 {
-	if( !strobjA or !strobjB or !strobjA->CStr or !strobjB->CStr )
+	if( !strobjA or !strobjB )
 		return;
 	
 	char *newstr = calloc(strobjA->Len + strobjB->Len + 1, sizeof *newstr);
@@ -74,16 +80,20 @@ void String_Add(struct String *const restrict strobjA, const struct String *cons
 		return;
 	
 	strobjA->Len += strobjB->Len;
-	strcat(newstr, strobjA->CStr);
-	strcat(newstr, strobjB->CStr);
-	free(strobjA->CStr), strobjA->CStr=NULL;
+	if( strobjA->CStr ) {
+		strcat(newstr, strobjA->CStr);
+		free(strobjA->CStr), strobjA->CStr=NULL;
+	}
+	if( strobjB->CStr )
+		strcat(newstr, strobjB->CStr);
+	
 	strobjA->CStr = newstr;
 	strobjA->CStr[strobjA->Len] = 0;
 }
 
 void String_AddStr(struct String *const restrict strobj, const char *restrict cstr)
 {
-	if( !strobj or !strobj->CStr or !cstr )
+	if( !strobj or !cstr )
 		return;
 	
 	char *newstr = calloc(strobj->Len + strlen(cstr) + 1, sizeof *newstr);
@@ -91,11 +101,17 @@ void String_AddStr(struct String *const restrict strobj, const char *restrict cs
 		return;
 	
 	strobj->Len += strlen(cstr);
-	strcat(newstr, strobj->CStr);
+	
+	if( strobj->CStr ) {
+		strcat(newstr, strobj->CStr);
+		free(strobj->CStr), strobj->CStr=NULL;
+	}
 	strcat(newstr, cstr);
-	free(strobj->CStr), strobj->CStr=NULL;
 	strobj->CStr = newstr;
 	strobj->CStr[strobj->Len] = 0;
+	#ifdef DEBUG
+	printf("String_AddStr == '%s'\n", strobj->CStr);
+	#endif
 }
 
 char *String_GetStr(const struct String *const restrict strobj)

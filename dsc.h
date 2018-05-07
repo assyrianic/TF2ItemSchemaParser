@@ -76,7 +76,7 @@ struct String {
 
 struct String *String_New(void);
 void String_Del(struct String *);
-void String_Free(struct String **);
+bool String_Free(struct String **);
 void String_Init(struct String *);
 void String_AddChar(struct String *, char);
 void String_Add(struct String *, const struct String *);
@@ -103,7 +103,7 @@ struct KeyVal {
 
 struct KeyVal *KeyVal_New(bool (*)());
 struct KeyVal *KeyVal_NewS(char *, bool (*)());
-void KeyVal_Free(struct KeyVal **);
+bool KeyVal_Free(struct KeyVal **);
 void KeyVal_Init(struct KeyVal *);
 void KeyVal_Print(struct KeyVal *);
 
@@ -124,6 +124,8 @@ struct KeyVal *KeyVal_FindLastSubKey(struct KeyVal *);
 struct KeyVal *KeyVal_FindByKeyName(struct KeyVal *, char *);
 bool KeyVal_HasKey(struct KeyVal *, char *);
 bool KeyVal_ReadItemSchema(struct KeyVal *);
+void KeyVal_GenerateEnum(/* struct KeyVal *, FILE * */);
+void KeyVal_GenerateStockFunc(/* struct KeyVal *, FILE * */);
 
 /***************/
 

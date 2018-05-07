@@ -33,10 +33,10 @@ struct KeyVal *KeyVal_NewS(char *restrict strKeyName, bool (*dtor)())
 	return node;
 }
 
-void KeyVal_Free(struct KeyVal **restrict kv)
+bool KeyVal_Free(struct KeyVal **restrict kv)
 {
 	if( !*kv )
-		return;
+		return false;
 	
 	struct KeyVal *iter = *kv;
 	String_Del(&iter->KeyName);
@@ -48,6 +48,7 @@ void KeyVal_Free(struct KeyVal **restrict kv)
 		KeyVal_Free(&iter->NextKey);
 	free(*kv); *kv=NULL;
 	iter=NULL;
+	return true;
 }
 
 void KeyVal_Init(struct KeyVal *const restrict kv)
@@ -392,6 +393,132 @@ bool KeyVal_ReadItemSchema(struct KeyVal *const restrict root)
 	bool r = KeyVal_RecursiveBuild(root, KVDatum);
 	free(buffer), buffer=NULL;
 	return r;
+}
+
+void KeyVal_GenerateEnum(struct KeyVal *const restrict kv, FILE *const restrict file)
+{
+	if( !kv or !file )
+		return;
+	
+	uint32_t i = 1;
+	// create our enum for the equip regions since certain items can have multiple equip regions.
+	fprintf(file, "\nenum {");
+	fprintf(file, "\n\tRegion_Invalid = 0,");
+	struct KeyVal *equip_regions_list = KeyVal_FindByKeyName(kv, "equip_regions_list");
+	for( struct KeyVal *regions = KeyVal_GetSubKey(equip_regions_list) ; regions ; regions=KeyVal_GetNextKey(regions) ) {
+		// some regions are shared, account for the individual regions
+		if( regions->Data.Type != TypeKeyval ) {
+			fprintf(file, "\n\tRegion_%s = 0x%x,", KeyVal_GetKeyName(regions), i);
+		}
+		// now we deal with the shared.
+		else if( regions->Data.Type == TypeKeyval ) {
+			for( struct KeyVal *shared = KeyVal_GetSubKey(regions) ; shared ; shared=KeyVal_GetNextKey(shared) )
+				fprintf(file, "\n\tRegion_%s = 0x%x,", KeyVal_GetKeyName(shared), i);
+		}
+		i <<= 1;
+	}
+	fprintf(file, "\n};\n");
+}
+
+void KeyVal_GenerateStockFunc(struct KeyVal *const restrict kv, FILE *const restrict file)
+{
+	if( !kv or !file )
+		return;
+	
+	// generate our function header to retrieve what equip regions a particular item occupies.
+	fprintf(file, "\nstock int RetrieveItemEquipRegions(const int itemindex)\n{");
+	
+	// generate the switch
+	fprintf(file, "\n\tswitch( itemindex ) {");
+	{
+		struct KeyVal *items = KeyVal_FindByKeyName(kv, "items");
+		// sometimes, a cosmetic doesn't have any equip regions
+		// but is based on a prefab, which MIGHT have equip regions...
+		struct KeyVal *prefabs = KeyVal_FindByKeyName(kv, "prefabs");
+		
+		for( struct KeyVal *kvitem = KeyVal_GetSubKey(items) ; kvitem ; kvitem=KeyVal_GetNextKey(kvitem) ) {
+			// make sure the item actually has an equipment region.
+			// some items have "equip_regions", adjust for that as well.
+			struct String switchbody = (struct String){0};
+			bool has_region = KeyVal_HasKey(kvitem, "equip_region");
+			bool has_regions = KeyVal_HasKey(kvitem, "equip_regions");
+			bool has_prefab = KeyVal_HasKey(kvitem, "prefab");
+			uint8_t writeflags = 0;
+			
+			#define WROTE_REGION	1
+			#define WROTE_BIT_OR	2
+			
+			String_AddStr(&switchbody, "\n\t\tcase ");
+			String_AddStr(&switchbody, KeyVal_GetKeyName(kvitem));
+			String_AddStr(&switchbody, ": return ");
+			
+			struct KeyVal *regiondata = NULL;
+			if( has_region )
+				regiondata = KeyVal_FindByKeyName(kvitem, "equip_region");
+			else if( has_regions )
+				regiondata = KeyVal_FindByKeyName(kvitem, "equip_regions");
+			
+			// some items take up multiple regions which is why I implemented regions as flags.
+			if( regiondata and regiondata->Data.Type==TypeKeyval ) {
+				// gotta use a while-loop for this one, we gotta check if the next keyvalue pointer
+				// is null or not so we know whether to add the bitwise-OR or not.
+				struct KeyVal *shared = regiondata->Data.Val.Keyval;
+				while( shared ) {
+					writeflags |= WROTE_REGION;
+					writeflags &= ~WROTE_BIT_OR;
+					String_AddStr(&switchbody, "Region_");
+					String_AddStr(&switchbody, KeyVal_GetKeyName(shared));
+					shared=KeyVal_GetNextKey(shared);
+					if( shared ) {
+						String_AddStr(&switchbody, " | ");
+						writeflags |= WROTE_BIT_OR;
+					}
+				}
+			}
+			else if( regiondata and regiondata->Data.Type != TypeKeyval ) {
+				writeflags |= WROTE_REGION;
+				String_AddStr(&switchbody, "Region_");
+				String_AddStr(&switchbody, KeyVal_Get(regiondata).Val.Str->CStr);
+			}
+			
+			// this one is tricky dicky.
+			if( has_prefab ) {
+				struct KeyVal *item_prefab = KeyVal_FindByKeyName(kvitem, "prefab");
+				regiondata = KeyVal_FindByKeyName(prefabs, KeyVal_Get(item_prefab).Val.Str->CStr);
+				while( regiondata ) {
+					if( KeyVal_HasKey(regiondata, "equip_region") ) {
+						if( writeflags & WROTE_REGION )
+							String_AddStr(&switchbody, " | ");
+						writeflags |= WROTE_REGION;
+						writeflags &= ~WROTE_BIT_OR;
+						String_AddStr(&switchbody, "Region_");
+						String_AddStr(&switchbody, KeyVal_Get(KeyVal_FindByKeyName(regiondata, "equip_region")).Val.Str->CStr);
+					}
+					
+					// check if the prefab has a nested prefab.
+					item_prefab = KeyVal_FindByKeyName(regiondata, "prefab");
+					if( !item_prefab ) {
+						regiondata=NULL;
+						break;
+					}
+					regiondata = KeyVal_FindByKeyName(prefabs, KeyVal_Get(item_prefab).Val.Str->CStr);
+					if( regiondata and KeyVal_HasKey(regiondata, "equip_region") /*(writeflags & WROTE_REGION)*/ ) {
+						writeflags |= WROTE_BIT_OR;
+						writeflags &= ~WROTE_REGION;
+						String_AddStr(&switchbody, " | ");
+					}
+				}
+			}
+			if( writeflags )
+				fprintf(file, "%s;", switchbody.CStr);
+			String_Del(&switchbody);
+		}
+		// add a default case for good measure.
+		fprintf(file, "\n\t\tdefault: return Region_Invalid;");
+	}
+	// EDIT: ughhh, have to add this for the end of the function even though default handles the remaining cases -_-.
+	// why can't I do plugins in C?
+	fprintf(file, "\n\t}\n\treturn Region_Invalid;\n}");
 }
 
 // https://www.youtube.com/watch?v=oY2KnW19Tls

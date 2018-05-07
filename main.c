@@ -52,16 +52,22 @@ int main()
 	
 	// create our function to retrieve what equip regions a particular item is.
 	fprintf(EnumIncludeFile, "\nstock int RetrieveItemEquipRegions(const int itemindex)\n{");
+	
+	// create the switch
 	fprintf(EnumIncludeFile, "\n\tswitch( itemindex ) {");
 	{
 		struct KeyVal *items = KeyVal_FindByKeyName(items_game, "items");
 		for( struct KeyVal *kvitem = KeyVal_GetSubKey(items) ; kvitem ; kvitem=KeyVal_GetNextKey(kvitem) ) {
+			// make sure the item actually has an equipment region.
 			if( KeyVal_HasKey(kvitem, "equip_region") ) {
 				fprintf(EnumIncludeFile, "\n\t\tcase %s: return ", KeyVal_GetKeyName(kvitem));
 				struct KeyVal *i = KeyVal_FindByKeyName(kvitem, "equip_region");
 				if( !i )
 					continue;
+				// some items take up multiple regions which is why I implemented regions as flags.
 				if( i->Data.Type==TypeKeyval ) {
+					// gotta use a while-loop for this one, we gotta check if the next keyvalue pointer is null or not
+					// so we know whether to add the bitwise-OR or not.
 					struct KeyVal *shared = i->Data.Val.Keyval;
 					while( shared ) {
 						fprintf(EnumIncludeFile, "Region_%s", KeyVal_GetKeyName(shared));
@@ -75,6 +81,7 @@ int main()
 				fprintf(EnumIncludeFile, ";");
 			}
 		}
+		// add a default case for good measure.
 		fprintf(EnumIncludeFile, "\n\t\tdefault: return Region_Invalid;");
 	}
 	fprintf(EnumIncludeFile, "\n\t}\n}");

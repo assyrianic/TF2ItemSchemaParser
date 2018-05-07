@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "dsc.h"
 
 /*
@@ -296,7 +297,7 @@ bool KeyVal_RecursiveBuild(struct KeyVal *const restrict kv, char *kvdata[static
 						i = i * 10 + *kvdata[KVIter]++ - '0';
 					}
 					// treat value entirely as string.
-					else String_AddChar(strVal, *kvdata[KVIter]++);
+					else String_AddChar(strVal, tolower(*kvdata[KVIter]++));
 				}
 				
 				kvIter->Data.Val.UInt64 = i;

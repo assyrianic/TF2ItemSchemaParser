@@ -80,6 +80,27 @@ int main()
 					fprintf(EnumIncludeFile, "Region_%s", KeyVal_Get(i).Val.Str->CStr);
 				fprintf(EnumIncludeFile, ";");
 			}
+			else if( KeyVal_HasKey(kvitem, "equip_regions") ) {
+				fprintf(EnumIncludeFile, "\n\t\tcase %s: return ", KeyVal_GetKeyName(kvitem));
+				struct KeyVal *i = KeyVal_FindByKeyName(kvitem, "equip_regions");
+				if( !i )
+					continue;
+				// some items take up multiple regions which is why I implemented regions as flags.
+				if( i->Data.Type==TypeKeyval ) {
+					// gotta use a while-loop for this one, we gotta check if the next keyvalue pointer is null or not
+					// so we know whether to add the bitwise-OR or not.
+					struct KeyVal *shared = i->Data.Val.Keyval;
+					while( shared ) {
+						fprintf(EnumIncludeFile, "Region_%s", KeyVal_GetKeyName(shared));
+						shared=KeyVal_GetNextKey(shared);
+						if( shared )
+							fprintf(EnumIncludeFile, " | ");
+					}
+				}
+				else if( i->Data.Type != TypeKeyval )
+					fprintf(EnumIncludeFile, "Region_%s", KeyVal_Get(i).Val.Str->CStr);
+				fprintf(EnumIncludeFile, ";");
+			}
 		}
 		// add a default case for good measure.
 		fprintf(EnumIncludeFile, "\n\t\tdefault: return Region_Invalid;");

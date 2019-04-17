@@ -32,7 +32,7 @@ int main()
 	KeyVal_ReadItemSchema(items_game);
 	
 #ifdef PROFILE
-	clock_t start = clock();
+	const clock_t start = clock();
 #endif
 	
 	// create our enum for the equip regions since certain items can have multiple equip regions.
@@ -46,5 +46,7 @@ int main()
 	
 	KeyVal_Free(&items_game);
 	fclose(IncludeFile); IncludeFile = NULL;
+#ifdef PROFILE
 	printf("items_game is NULL? '%s'\n", items_game ? "no" : "yes");
+#endif
 }

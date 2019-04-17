@@ -14,7 +14,7 @@ struct KeyVal {
 };
 */
 
-struct KeyVal *KeyVal_New(bool (*dtor)())
+struct KeyVal *KeyVal_New(bool (*const dtor)())
 {
 	struct KeyVal *node = calloc(1, sizeof *node);
 	if( node ) {
@@ -23,7 +23,7 @@ struct KeyVal *KeyVal_New(bool (*dtor)())
 	return node;
 }
 
-struct KeyVal *KeyVal_NewS(char *restrict strKeyName, bool (*dtor)())
+struct KeyVal *KeyVal_NewS(char *restrict strKeyName, bool (*const dtor)())
 {
 	struct KeyVal *node = calloc(1, sizeof *node);
 	if( node ) {
@@ -33,7 +33,7 @@ struct KeyVal *KeyVal_NewS(char *restrict strKeyName, bool (*dtor)())
 	return node;
 }
 
-bool KeyVal_Free(struct KeyVal **restrict kv)
+bool KeyVal_Free(struct KeyVal **kv)
 {
 	if( !*kv )
 		return false;
@@ -51,16 +51,15 @@ bool KeyVal_Free(struct KeyVal **restrict kv)
 	return true;
 }
 
-void KeyVal_Init(struct KeyVal *const restrict kv)
+void KeyVal_Init(struct KeyVal *const kv)
 {
 	if( !kv )
 		return;
-	
-	*kv = (struct KeyVal){0};
+	else *kv = (struct KeyVal){0};
 }
 
 
-void KeyVal_Print(struct KeyVal *const restrict kv)
+void KeyVal_Print(struct KeyVal *const kv)
 {
 	if( !kv )
 		return;
@@ -80,22 +79,22 @@ void KeyVal_Print(struct KeyVal *const restrict kv)
 	}
 }
 
-struct Variant KeyVal_Get(struct KeyVal *const restrict kv)
+struct Variant KeyVal_Get(struct KeyVal *const kv)
 {
 	return !kv ? (struct Variant){0} : kv->Data;
 }
 
-struct String *KeyVal_GetStr(struct KeyVal *const restrict kv)
+struct String *KeyVal_GetStr(struct KeyVal *const kv)
 {
 	return !kv or kv->Data.Type != TypeStr ? NULL : kv->Data.Val.Str;
 }
 
-struct KeyVal *KeyVal_GetSubKey(struct KeyVal *const restrict kv)
+struct KeyVal *KeyVal_GetSubKey(struct KeyVal *const kv)
 {
 	return !kv or kv->Data.Type != TypeKeyval ? NULL : kv->Data.Val.Keyval;
 }
 
-struct KeyVal *KeyVal_GetNextKey(struct KeyVal *const restrict kv)
+struct KeyVal *KeyVal_GetNextKey(struct KeyVal *const kv)
 {
 	return !kv ? NULL : kv->NextKey;
 }
@@ -114,7 +113,7 @@ void KeyVal_Set(struct KeyVal *const restrict kv, const struct Variant val)
 	kv->Data = val;
 }
 
-void KeyVal_SetSubKey(struct KeyVal *const restrict kv, struct KeyVal *const restrict subkey)
+void KeyVal_SetSubKey(struct KeyVal *const restrict kv, struct KeyVal *const subkey)
 {
 	if( !kv or !subkey )
 		return;
@@ -123,7 +122,7 @@ void KeyVal_SetSubKey(struct KeyVal *const restrict kv, struct KeyVal *const res
 	kv->Data.Type = TypeKeyval;
 }
 
-void KeyVal_SetNextKey(struct KeyVal *const restrict kv, struct KeyVal *const restrict nextkey)
+void KeyVal_SetNextKey(struct KeyVal *const restrict kv, struct KeyVal *const nextkey)
 {
 	if( !kv or !nextkey )
 		return;
@@ -139,7 +138,7 @@ void KeyVal_SetKeyName(struct KeyVal *const restrict kv, char *restrict cstr)
 	String_CopyStr(&kv->KeyName, cstr);
 }
 
-struct KeyVal *KeyVal_GetFirstSubKey(struct KeyVal *const restrict kv)
+struct KeyVal *KeyVal_GetFirstSubKey(struct KeyVal *const kv)
 {
 	if( !kv )
 		return NULL;
@@ -151,7 +150,7 @@ struct KeyVal *KeyVal_GetFirstSubKey(struct KeyVal *const restrict kv)
 	return Ret;
 }
 
-struct KeyVal *KeyVal_GetNextSubKey(struct KeyVal *const restrict kv)
+struct KeyVal *KeyVal_GetNextSubKey(struct KeyVal *const kv)
 {
 	if( !kv )
 		return NULL;
@@ -163,7 +162,7 @@ struct KeyVal *KeyVal_GetNextSubKey(struct KeyVal *const restrict kv)
 	return Ret;
 }
 
-struct KeyVal *KeyVal_FindLastSubKey(struct KeyVal *const restrict kv)
+struct KeyVal *KeyVal_FindLastSubKey(struct KeyVal *const kv)
 {
 	if( !kv )
 		return NULL;
@@ -210,10 +209,15 @@ static bool IsWhiteSpace(const char c)
 {
 	return( c==' ' or c=='\t' or c=='\r' or c=='\v' or c=='\f' or c=='\n' );
 }
+
+
 enum {
-	KVBuffer=0, KVIter, KVEnd,
+	KVBuffer, 
+	KVIter, 
+	KVEnd,
 };
-bool KeyVal_RecursiveBuild(struct KeyVal *const restrict kv, char *kvdata[static 3])
+
+bool KeyVal_RecursiveBuild(struct KeyVal *const kv, char *kvdata[static 3])
 {
 	if( !kv or !kvdata )
 		return false;
@@ -272,7 +276,7 @@ bool KeyVal_RecursiveBuild(struct KeyVal *const restrict kv, char *kvdata[static
 			kvdata[KVIter]++;
 			
 			// copy the entire name to our string object.
-			while( *kvdata[KVIter] != '"' and kvdata[KVIter]<=kvdata[KVEnd] )
+			while( *kvdata[KVIter] != '"' and kvdata[KVIter]<kvdata[KVEnd] )
 				String_AddChar(&kvIter->KeyName, *kvdata[KVIter]++);
 			//printf("KeyVal_RecursiveBuild :: KeyName == %s\n", String_GetStr(kvIter->KeyName));
 			
@@ -291,7 +295,7 @@ bool KeyVal_RecursiveBuild(struct KeyVal *const restrict kv, char *kvdata[static
 				if( !IsNum )
 					strVal = String_New();
 				uint64_t i = 0;
-				while( *kvdata[KVIter] != '"' and kvdata[KVIter]<=kvdata[KVEnd] ) {
+				while( *kvdata[KVIter] != '"' and kvdata[KVIter]<kvdata[KVEnd] ) {
 					if( IsNum ) {
 						if( *kvdata[KVIter]=='.' )
 							kvdata[KVIter]++;
@@ -352,23 +356,23 @@ bool KeyVal_ReadItemSchema(struct KeyVal *const restrict root)
 	
 	/* get file Len so we can allocate our char* buffer. */
 	fseek(file, 0, SEEK_END);
-	long int telldata = ftell(file);
+	const long int telldata = ftell(file);
 	if( telldata <= -1L ) {
 		puts("KeyVal_ReadItemSchema :: **** ERROR: filesize less than 1 ****");
 		fclose(file), file=NULL;
 		return false;
 	}
-	size_t filesize = (size_t)telldata;
+	const size_t filesize = (size_t)telldata;
 	rewind(file);
 	
 	/* allocate buffer and read in file. */
-	char *buffer = calloc(filesize+1, sizeof *buffer);
+	char *buffer = calloc(filesize+2, sizeof *buffer);
 	if( !buffer ) {
 		puts("KeyVal_ReadItemSchema :: **** ERROR: unable to allocate file buffer. ****");
 		fclose(file), file=NULL;
 		return false;
 	}
-	size_t errcheck = fread(buffer, sizeof *buffer, filesize, file);
+	const size_t errcheck = fread(buffer, sizeof *buffer, filesize, file);
 	fclose(file), file=NULL;
 	if( errcheck != filesize ) {
 		puts("KeyVal_ReadItemSchema :: **** ERROR: error reading file to buffer. ****");
@@ -381,12 +385,7 @@ bool KeyVal_ReadItemSchema(struct KeyVal *const restrict root)
 	 * buffer fully read in, use an iterator to lex and parse the .ini
 	 * make sure we don't overrun the buffer's boundary.
 	 */
-	
-	char *KVDatum[3]={NULL};
-	KVDatum[KVBuffer] = buffer;
-	KVDatum[KVIter] = buffer;
-	KVDatum[KVEnd] = buffer + filesize;
-	
+	char *KVDatum[3]={ buffer, buffer, buffer+filesize };
 	//printf("buffer == \n%s\n\n", buffer);
 	
 	/* do a recursive read and build our tree. */
@@ -395,7 +394,7 @@ bool KeyVal_ReadItemSchema(struct KeyVal *const restrict root)
 	return r;
 }
 
-void KeyVal_GenerateEnum(struct KeyVal *const restrict kv, FILE *const restrict file)
+void KeyVal_GenerateEnum(struct KeyVal *const kv, FILE *const file)
 {
 	if( !kv or !file )
 		return;
@@ -420,13 +419,13 @@ void KeyVal_GenerateEnum(struct KeyVal *const restrict kv, FILE *const restrict 
 	fprintf(file, "\n};\n");
 }
 
-void KeyVal_GenerateStockFunc(struct KeyVal *const restrict kv, FILE *const restrict file)
+void KeyVal_GenerateStockFunc(struct KeyVal *const kv, FILE *const file)
 {
 	if( !kv or !file )
 		return;
 	
 	// generate our function header to retrieve what equip regions a particular item occupies.
-	fprintf(file, "\nstock int RetrieveItemEquipRegions(const int itemindex)\n{");
+	fprintf(file, "\nstock int GetItemEquipRegions(const int itemindex)\n{");
 	
 	// generate the switch
 	fprintf(file, "\n\tswitch( itemindex ) {");
